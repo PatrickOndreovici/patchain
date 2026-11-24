@@ -1,0 +1,24 @@
+# Local learning & tooling files
+skills/
+LEARNING_PLAN.md
+
+# Go binaries, build artifacts & test coverage
+/blocker
+/bin/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+
+# Blockchain local data & private keys (never commit!)
+.data/
+keystore/
+*.key
+
+# IDE & OS files
+.idea/
+.vscode/
+.DS_Store
