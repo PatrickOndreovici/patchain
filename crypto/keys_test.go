@@ -3,6 +3,7 @@ package crypto
 import (
 	"bytes"
 	"crypto/ed25519"
+	"encoding/hex"
 	"testing"
 )
 
@@ -37,6 +38,41 @@ func TestPublicKeyDefensiveCopy(t *testing.T) {
 	freshPubKey := privKey.PublicKey()
 	if !bytes.Equal(original, freshPubKey.Bytes()) {
 		t.Fatal("mutating PublicKey bytes corrupted the underlying PrivateKey")
+	}
+}
+
+func TestPublicKeyAddress(t *testing.T) {
+	pubKey := GeneratePrivateKey().PublicKey()
+	addr := pubKey.Address()
+
+	if len(addr.Bytes()) != addressSize {
+		t.Fatalf("expected address length %d, got %d", addressSize, len(addr.Bytes()))
+	}
+
+	// Each byte encodes to 2 hex characters (20 bytes -> 40 hex chars).
+	hexStr := addr.String()
+	if len(hexStr) != addressSize*2 {
+		t.Fatalf("expected hex address length %d, got %d", addressSize*2, len(hexStr))
+	}
+	if _, err := hex.DecodeString(hexStr); err != nil {
+		t.Fatalf("expected valid hex string, got error: %v", err)
+	}
+
+	// Deriving the address twice from the same public key must be deterministic.
+	if addr != pubKey.Address() {
+		t.Fatal("expected address derivation to be deterministic")
+	}
+
+	// Two different keys must derive different addresses.
+	otherAddr := GeneratePrivateKey().PublicKey().Address()
+	if addr == otherAddr {
+		t.Fatal("expected different public keys to produce different addresses")
+	}
+
+	// Verify Address works directly as a Go map key (used for balances/nonces later).
+	balances := map[Address]uint64{addr: 100}
+	if balances[addr] != 100 {
+		t.Fatalf("expected map lookup by Address to return 100, got %d", balances[addr])
 	}
 }
 

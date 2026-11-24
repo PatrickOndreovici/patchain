@@ -3,6 +3,8 @@ package crypto
 import (
 	"crypto/ed25519"
 	"crypto/rand"
+	"crypto/sha256"
+	"encoding/hex"
 	"io"
 )
 
@@ -10,7 +12,18 @@ const (
 	privateKeySize = 64
 	publicKeySize  = 32
 	seedSize       = 32
+	addressSize    = 20
 )
+
+type Address [addressSize]byte
+
+func (a Address) Bytes() []byte {
+	return a[:]
+}
+
+func (a Address) String() string {
+	return hex.EncodeToString(a[:])
+}
 
 type Signature struct {
 	value []byte
@@ -57,6 +70,13 @@ type PublicKey struct {
 
 func (p *PublicKey) Bytes() []byte {
 	return p.key
+}
+
+func (p *PublicKey) Address() Address {
+	hash := sha256.Sum256(p.key)
+	var addr Address
+	copy(addr[:], hash[len(hash)-addressSize:])
+	return addr
 }
 
 func (p *PublicKey) Verify(msg []byte, sig *Signature) bool {
