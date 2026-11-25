@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
+	"fmt"
 	"io"
 )
 
@@ -46,6 +47,21 @@ func GeneratePrivateKey() *PrivateKey {
 	return &PrivateKey{
 		key: ed25519.NewKeyFromSeed(seed),
 	}
+}
+
+func PrivateKeyFromSeed(seed []byte) (*PrivateKey, error) {
+	if len(seed) != seedSize {
+		return nil, fmt.Errorf("invalid seed length: got %d, want %d", len(seed), seedSize)
+	}
+	return &PrivateKey{
+		key: ed25519.NewKeyFromSeed(seed),
+	}, nil
+}
+
+func (p *PrivateKey) Seed() []byte {
+	seed := make([]byte, seedSize)
+	copy(seed, p.key[:seedSize])
+	return seed
 }
 
 func (p *PrivateKey) Bytes() []byte {

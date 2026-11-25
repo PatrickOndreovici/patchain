@@ -26,6 +26,31 @@ func TestGeneratePrivateKey(t *testing.T) {
 	}
 }
 
+func TestPrivateKeySeedRoundTrip(t *testing.T) {
+	orig := GeneratePrivateKey()
+	seed := orig.Seed()
+
+	if len(seed) != seedSize {
+		t.Fatalf("expected seed length %d, got %d", seedSize, len(seed))
+	}
+
+	restored, err := PrivateKeyFromSeed(seed)
+	if err != nil {
+		t.Fatalf("PrivateKeyFromSeed failed: %v", err)
+	}
+	if !bytes.Equal(orig.Bytes(), restored.Bytes()) {
+		t.Fatal("restored private key does not match original")
+	}
+	if orig.PublicKey().Address() != restored.PublicKey().Address() {
+		t.Fatal("restored address does not match original")
+	}
+
+	// Invalid seed length must return an error.
+	if _, err := PrivateKeyFromSeed([]byte("too-short")); err == nil {
+		t.Fatal("expected error for invalid seed length")
+	}
+}
+
 func TestPublicKeyDefensiveCopy(t *testing.T) {
 	privKey := GeneratePrivateKey()
 	pubKey := privKey.PublicKey()
