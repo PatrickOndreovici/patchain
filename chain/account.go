@@ -6,6 +6,7 @@ import (
 	"crypto/cipher"
 	"crypto/rand"
 	"encoding/json"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -101,12 +102,47 @@ func (a *Account) Write(dir string, pass []byte) error {
 }
 
 func ReadAccount(path string, pass []byte) (*Account, error) {
-	// TODO (your turn!):
-	// 1. Read file bytes with os.ReadFile(path) and json.Unmarshal into encryptedKeystore.
-	// 2. Re-derive the AES key with deriveKey(pass, ks.Salt).
-	// 3. Create AES cipher (aes.NewCipher) and wrap with GCM (cipher.NewGCM).
-	// 4. Decrypt the seed with gcm.Open(nil, ks.Nonce, ks.Ciphertext, nil).
-	// 5. Reconstruct the private key with crypto.PrivateKeyFromSeed(seed).
-	// 6. Return &Account{privKey: privKey, addr: privKey.PublicKey().Address()}, nil.
-	return nil, nil
+	// 1. Read file bytes and unmarshal JSON into encryptedKeystore.
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+	var ks encryptedKeystore
+	if err := json.Unmarshal(data, &ks); err != nil {
+		return nil, err
+	}
+
+	// 2. Re-derive the AES key with the saved salt and supplied password.
+	key := deriveKey(pass, ks.Salt)
+
+	// 3. Create AES cipher and wrap with GCM.
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		return nil, err
+	}
+	gcm, err := cipher.NewGCM(block)
+	if err != nil {
+		return nil, err
+	}
+	if len(ks.Nonce) != gcm.NonceSize() {
+		return nil, fmt.Errorf("invalid nonce size: got %d, want %d", len(ks.Nonce), gcm.NonceSize())
+	}
+
+	// 4. Decrypt and authenticate the seed.
+	seed, err := gcm.Open(nil, ks.Nonce, ks.Ciphertext, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	// 5. Reconstruct the Ed25519 private key from the decrypted seed.
+	privKey, err := crypto.PrivateKeyFromSeed(seed)
+	if err != nil {
+		return nil, err
+	}
+
+	// 6. Return the reconstructed Account.
+	return &Account{
+		privKey: privKey,
+		addr:    privKey.PublicKey().Address(),
+	}, nil
 }

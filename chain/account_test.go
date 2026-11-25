@@ -121,3 +121,60 @@ func TestReadAccountTamperedCiphertext(t *testing.T) {
 		t.Fatal("expected ReadAccount to reject tampered ciphertext")
 	}
 }
+
+func TestReadAccountEdgeCases(t *testing.T) {
+	dir := t.TempDir()
+	pass := []byte("my-password")
+
+	// 1. Non-existent file must return an error.
+	if _, err := ReadAccount(filepath.Join(dir, "does-not-exist.json"), pass); err == nil {
+		t.Fatal("expected error for missing file")
+	}
+
+	// 2. Corrupt (non-JSON) file must return an error.
+	badJSONPath := filepath.Join(dir, "corrupt.json")
+	if err := os.WriteFile(badJSONPath, []byte("not valid json {{{"), 0600); err != nil {
+		t.Fatalf("WriteFile failed: %v", err)
+	}
+	if _, err := ReadAccount(badJSONPath, pass); err == nil {
+		t.Fatal("expected error for invalid JSON file")
+	}
+
+	// 3. Invalid nonce length must return an error (never panic in gcm.Open).
+	badNonceKS := encryptedKeystore{
+		Salt:       make([]byte, saltSize),
+		Nonce:      []byte("short"),
+		Ciphertext: []byte("anything"),
+	}
+	badNonceBytes, _ := json.Marshal(badNonceKS)
+	badNoncePath := filepath.Join(dir, "bad-nonce.json")
+	if err := os.WriteFile(badNoncePath, badNonceBytes, 0600); err != nil {
+		t.Fatalf("WriteFile failed: %v", err)
+	}
+	if _, err := ReadAccount(badNoncePath, pass); err == nil {
+		t.Fatal("expected error for invalid nonce size")
+	}
+
+	// 4. Tampering with the saved salt changes the derived AES key and must fail decryption.
+	acc := NewAccount()
+	if err := acc.Write(dir, pass); err != nil {
+		t.Fatalf("Write failed: %v", err)
+	}
+	accPath := filepath.Join(dir, acc.Address().String()+".json")
+	raw, err := os.ReadFile(accPath)
+	if err != nil {
+		t.Fatalf("ReadFile failed: %v", err)
+	}
+	var ks encryptedKeystore
+	if err := json.Unmarshal(raw, &ks); err != nil {
+		t.Fatalf("Unmarshal failed: %v", err)
+	}
+	ks.Salt[0] ^= 0xff
+	tamperedSalt, _ := json.Marshal(ks)
+	if err := os.WriteFile(accPath, tamperedSalt, 0600); err != nil {
+		t.Fatalf("WriteFile failed: %v", err)
+	}
+	if _, err := ReadAccount(accPath, pass); err == nil {
+		t.Fatal("expected error when salt is tampered")
+	}
+}
