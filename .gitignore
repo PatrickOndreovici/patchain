@@ -1,6 +1,7 @@
 # Local learning & tooling files
 skills/
 LEARNING_PLAN.md
+quiz.html
 
 # Go binaries, build artifacts & test coverage
 /blocker

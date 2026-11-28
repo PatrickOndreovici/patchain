@@ -26,12 +26,44 @@ func (a Address) String() string {
 	return hex.EncodeToString(a[:])
 }
 
+func (a Address) MarshalText() ([]byte, error) {
+	return []byte(a.String()), nil
+}
+
+func (a *Address) UnmarshalText(text []byte) error {
+	b, err := hex.DecodeString(string(text))
+	if err != nil {
+		return err
+	}
+	if len(b) != addressSize {
+		return fmt.Errorf("invalid address length: got %d, want %d", len(b), addressSize)
+	}
+	copy(a[:], b)
+	return nil
+}
+
 type Signature struct {
 	value []byte
 }
 
 func (s *Signature) Bytes() []byte {
 	return s.value
+}
+
+func (s Signature) MarshalText() ([]byte, error) {
+	return []byte(hex.EncodeToString(s.value)), nil
+}
+
+func (s *Signature) UnmarshalText(text []byte) error {
+	b, err := hex.DecodeString(string(text))
+	if err != nil {
+		return err
+	}
+	if len(b) != ed25519.SignatureSize {
+		return fmt.Errorf("invalid signature length: got %d, want %d", len(b), ed25519.SignatureSize)
+	}
+	s.value = b
+	return nil
 }
 
 type PrivateKey struct {
@@ -86,6 +118,22 @@ type PublicKey struct {
 
 func (p *PublicKey) Bytes() []byte {
 	return p.key
+}
+
+func (p PublicKey) MarshalText() ([]byte, error) {
+	return []byte(hex.EncodeToString(p.key)), nil
+}
+
+func (p *PublicKey) UnmarshalText(text []byte) error {
+	b, err := hex.DecodeString(string(text))
+	if err != nil {
+		return err
+	}
+	if len(b) != publicKeySize {
+		return fmt.Errorf("invalid public key length: got %d, want %d", len(b), publicKeySize)
+	}
+	p.key = b
+	return nil
 }
 
 func (p *PublicKey) Address() Address {
